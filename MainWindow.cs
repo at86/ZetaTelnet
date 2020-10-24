@@ -25,34 +25,38 @@ namespace ZetaTelnet
         List<String> _scrollback = new List<String>();
         int _scrollbackPosition = -1;
         bool _stripANSI = true;
+        Int32 bytesLen = 64 * 1024;
 
         public ZetaTelnet()
         {
             InitializeComponent();
             //txtInput.KeyPress += new KeyPressEventHandler(KeyHandler);
-            txtInput.KeyDown += new KeyEventHandler(KeyHandler);
+
+            // atdo comment it 1..
+            //txtInput.KeyDown += new KeyEventHandler(KeyHandler);
         }
 
         ~ZetaTelnet()
         {
-            if( _socket != null )
+            if (_socket != null)
             {
                 _socket.Shutdown(SocketShutdown.Both);
                 _socket.Close();
             }
         }
 
+        // atdo comment it 1..
         private void KeyHandler(Object o, KeyEventArgs e)
         {
-            if( e.KeyCode == Keys.Return )
+            if (e.KeyCode == Keys.Return)
             {
                 e.Handled = true;
-                if( _socket != null && _socket.Connected == true )
+                if (_socket != null && _socket.Connected == true)
                 {
                     _scrollback.Add(txtInput.Text);
                     _scrollbackPosition = _scrollback.Count;
                     byte[] sendBytes = Encoding.ASCII.GetBytes(txtInput.Text + "\n");
-                    AsyncCallback onsend = new AsyncCallback( OnSend );
+                    AsyncCallback onsend = new AsyncCallback(OnSend);
                     _socket.BeginSend(sendBytes, 0, sendBytes.Length, SocketFlags.None, onsend, _socket);
                     AddTerminalText(txtInput.Text + "\n");
                     txtInput.Text = "";
@@ -60,7 +64,7 @@ namespace ZetaTelnet
             }
             else if (e.KeyCode == Keys.Up)
             {
-                if (_scrollbackPosition > 0 && _scrollback.Count > 0 )
+                if (_scrollbackPosition > 0 && _scrollback.Count > 0)
                 {
                     _scrollbackPosition--;
                     txtInput.Text = _scrollback[_scrollbackPosition];
@@ -81,7 +85,7 @@ namespace ZetaTelnet
             }
         }
 
-        public void OnSend( IAsyncResult ar )
+        public void OnSend(IAsyncResult ar)
         {
             _socket = (Socket)ar.AsyncState;
 
@@ -96,7 +100,7 @@ namespace ZetaTelnet
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "Error processing receive buffer!");
-            }            
+            }
         }
 
         private void btnConnect_Click(object sender, EventArgs e)
@@ -105,11 +109,12 @@ namespace ZetaTelnet
             {
                 _ipHost = Dns.GetHostEntry(txtIP.Text);
             }
-            catch( SystemException)
+            catch (SystemException)
             {
                 MessageBox.Show("Unable to resolve IP Address");
                 return;
             }
+
             try
             {
                 foreach (IPAddress address in _ipHost.AddressList)
@@ -121,7 +126,7 @@ namespace ZetaTelnet
                     }
                 }
             }
-            catch(SystemException)
+            catch (SystemException)
             {
                 MessageBox.Show("IP Address does not resolve to any known hosts.");
                 return;
@@ -131,6 +136,7 @@ namespace ZetaTelnet
                 MessageBox.Show("Cannot find host for address " + txtIP.Text + ".");
                 return;
             }
+
             try
             {
                 _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -140,23 +146,24 @@ namespace ZetaTelnet
                 MessageBox.Show("Unable to create socket.");
                 return;
             }
+
             try
             {
                 _socket.Blocking = false;
-                AsyncCallback onconnect = new AsyncCallback( OnConnect );
+                AsyncCallback onconnect = new AsyncCallback(OnConnect);
                 int port;
                 try
                 {
                     port = Int32.Parse(txtPort.Text);
                 }
-                catch( SystemException)
+                catch (SystemException)
                 {
                     MessageBox.Show("Unable to connect: Bad port number (must be an integer)");
                     return;
                 }
                 _socket.BeginConnect(_ipAddress, port, onconnect, _socket);
             }
-            catch ( SocketException ex)
+            catch (SocketException ex)
             {
                 int errorCode = ex.ErrorCode;
                 MessageBox.Show("Socket error " + errorCode.ToString() + " on BeginConnect");
@@ -170,14 +177,14 @@ namespace ZetaTelnet
 
         }
 
-        public void OnConnect( IAsyncResult ar )
+        public void OnConnect(IAsyncResult ar)
         {
-            _socket = (Socket) ar.AsyncState;
+            _socket = (Socket)ar.AsyncState;
 
             try
             {
                 _socket.EndConnect(ar);
-                if( _socket.Connected )
+                if (_socket.Connected)
                 {
                     SetupReceiveCallback(_socket);
                     EnableConnect(false);
@@ -189,7 +196,7 @@ namespace ZetaTelnet
                     return;
                 }
             }
-            catch( Exception ex)
+            catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "Connection Error");
                 EnableConnect(true);
@@ -197,17 +204,18 @@ namespace ZetaTelnet
             }
         }
 
-        public void SetupReceiveCallback( Socket sock )
+        public void SetupReceiveCallback(Socket sock)
         {
             try
             {
                 AsyncCallback receiveData = new AsyncCallback(OnReceiveData);
-                _inBuffer = new byte[1024];
-                sock.BeginReceive(_inBuffer, 0, 1024, SocketFlags.None, receiveData, sock);
+                _inBuffer = new byte[bytesLen];
+                sock.BeginReceive(_inBuffer, 0, bytesLen, SocketFlags.None, receiveData, sock);
             }
-            catch( Exception ex )
+            catch (Exception ex)
             {
-                MessageBox.Show("Setup receive callback failed: " + ex.ToString() );
+                MessageBox.Show("Setup receive callback failed: " + ex.ToString());
+                disconnect();
                 return;
             }
         }
@@ -216,9 +224,9 @@ namespace ZetaTelnet
         /// Process data received from the socket.
         /// </summary>
         /// <param name="ar"></param>
-        public void OnReceiveData( IAsyncResult ar )
+        public void OnReceiveData(IAsyncResult ar)
         {
-            _socket = (Socket) ar.AsyncState;
+            _socket = (Socket)ar.AsyncState;
 
             if (_socket == null || !_socket.Connected)
                 return;
@@ -226,23 +234,23 @@ namespace ZetaTelnet
             try
             {
                 int bytesReceived = _socket.EndReceive(ar);
-                if( bytesReceived > 0)
+                if (bytesReceived > 0)
                 {
-                    string buffer = Encoding.ASCII.GetString(_inBuffer, 0, 1024);
+                    string buffer = Encoding.ASCII.GetString(_inBuffer, 0, bytesLen);
 
-                    AddTerminalText( buffer );
+                    AddTerminalText(buffer);
                     _inBuffer = null;
                 }
                 SetupReceiveCallback(_socket);
             }
-            catch( SocketException ex)
+            catch (SocketException ex)
             {
                 MessageBox.Show("Error Receiving Data: " + ex.ToString());
                 if (_socket != null)
                     _socket.Close();
                 EnableConnect(true);
             }
-            catch( Exception ex)
+            catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "Error processing receive buffer!");
                 return;
@@ -255,11 +263,12 @@ namespace ZetaTelnet
         /// <param name="e"></param>
         protected override void OnSizeChanged(EventArgs e)
         {
-            int previousHeight = txtTerminal.Height;
+            //int previousHeight = txtTerminal.Height;
             //txtTerminal.Height = this.Height - 92;
-            txtTerminal.Height = this.Height - 115;
-            int newInputY = txtTerminal.Location.Y + txtTerminal.Height;
-            txtInput.Location = new Point(txtInput.Location.X, newInputY);
+            //txtTerminal.Height = this.Height - 115;
+            //int newInputY = txtTerminal.Location.Y + txtTerminal.Height;
+            //txtInput.Location = new Point(txtInput.Location.X, newInputY);
+
             txtInput.Width = this.Width - 14;
             txtTerminal.Width = this.Width - 14;
             base.OnSizeChanged(e);
@@ -271,7 +280,7 @@ namespace ZetaTelnet
         /// <param name="text"></param>
         private void AddTerminalText(string text)
         {
-            // InvokeRequired required compares the thread ID of the
+            //InvokeRequired required compares the thread ID of the
             // calling thread to the thread ID of the creating thread.
             // If these threads are different, it returns true.
             if (this.txtTerminal.InvokeRequired)
@@ -294,13 +303,18 @@ namespace ZetaTelnet
         }
 
         public static String RemoveANSICodes(string text)
-        { 
+        {
             text = Regex.Replace(text, @"\e\[\d*(;?\d)+m", "");
             text = text.Replace("\n\r", "\r\n");
             return text;
         }
 
         private void btnDisconnect_Click(object sender, EventArgs e)
+        {
+            disconnect();
+        }
+
+        private void disconnect()
         {
             _socket.Close();
             EnableConnect(true);
@@ -322,7 +336,7 @@ namespace ZetaTelnet
 
         private void txtTerminal_Click(object sender, EventArgs e)
         {
-            txtInput.Focus();
+            //txtInput.Focus();
         }
 
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
@@ -381,6 +395,18 @@ namespace ZetaTelnet
             if (dlg.ShowDialog() == DialogResult.OK)
             {
                 txtTerminal.BackColor = dlg.Color;
+            }
+        }
+
+        private void btnSend_Click(object sender, EventArgs e)
+        {
+            if (_socket != null && _socket.Connected == true)
+            {
+                byte[] sendBytes = Encoding.ASCII.GetBytes(txtInput.Text + "\n");
+                AsyncCallback onsend = new AsyncCallback(OnSend);
+                _socket.BeginSend(sendBytes, 0, sendBytes.Length, SocketFlags.None, onsend, _socket);
+                AddTerminalText(txtInput.Text + "\n");
+                txtInput.Text = "";
             }
         }
     }
