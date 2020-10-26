@@ -126,5 +126,10 @@ namespace ZetaTelnet
                 txtTerminal.BackColor = dlg.Color;
             }
         }
+
+        private void tableLayoutPanel2_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
     }
 }
